@@ -104,20 +104,28 @@ def m_ico(name, r=1.0, sub=2, jitter=0.0, smooth=True):
     return mesh_from_bm(name, bm, smooth)
 
 
-def m_cone(name, r1, r2, depth, seg=24, matrix=None, smooth=True, caps=True):
+def _bevel(bm, w):
+    if w:
+        bmesh.ops.bevel(bm, geom=bm.edges[:], offset=w, offset_type="OFFSET", segments=2,
+                        profile=0.5, affect="EDGES")
+
+
+def m_cone(name, r1, r2, depth, seg=24, matrix=None, smooth=True, caps=True, bevel=0.0):
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=caps, cap_tris=False, segments=seg,
                           radius1=r1, radius2=r2, depth=depth)
-    return mesh_from_bm(name, bm, smooth, matrix)
+    _bevel(bm, bevel)
+    return mesh_from_bm(name, bm, smooth and not bevel, matrix)
 
 
-def m_box(name, sx, sy, sz, matrix=None):
+def m_box(name, sx, sy, sz, matrix=None, bevel=0.0):
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     for vtx in bm.verts:
         vtx.co.x *= sx
         vtx.co.y *= sy
         vtx.co.z *= sz
+    _bevel(bm, bevel)
     return mesh_from_bm(name, bm, False, matrix)
 
 
@@ -204,6 +212,7 @@ world.use_nodes = True
 wn = world.node_tree
 wn.nodes.clear()
 tc = wn.nodes.new("ShaderNodeTexCoord")
+# what the camera sees: stars
 vor = wn.nodes.new("ShaderNodeTexVoronoi")
 vor.inputs["Scale"].default_value = 260
 ramp = wn.nodes.new("ShaderNodeValToRGB")
@@ -218,31 +227,78 @@ mul.blend_type = "MULTIPLY"
 mul.inputs[0].default_value = 1
 bg = wn.nodes.new("ShaderNodeBackground")
 bg.inputs["Strength"].default_value = 2.2
-wo = wn.nodes.new("ShaderNodeOutputWorld")
 wn.links.new(tc.outputs["Generated"], vor.inputs["Vector"])
 wn.links.new(tc.outputs["Generated"], noi.inputs["Vector"])
 wn.links.new(vor.outputs["Distance"], ramp.inputs[0])
 wn.links.new(ramp.outputs[0], mul.inputs[1])
 wn.links.new(noi.outputs[0], mul.inputs[2])
 wn.links.new(mul.outputs[0], bg.inputs["Color"])
-wn.links.new(bg.outputs[0], wo.inputs[0])
+# what shiny surfaces reflect: a cloudy blue Earth below, black sky above
+sep = wn.nodes.new("ShaderNodeSeparateXYZ")
+emask = wn.nodes.new("ShaderNodeMapRange")
+emask.inputs[1].default_value = 0.08
+emask.inputs[2].default_value = -0.22
+cn = wn.nodes.new("ShaderNodeTexNoise")
+cn.inputs["Scale"].default_value = 5.0
+cn.inputs["Detail"].default_value = 8
+cn.inputs["Distortion"].default_value = 1.2
+cramp = wn.nodes.new("ShaderNodeValToRGB")
+cramp.color_ramp.elements[0].position = 0.45
+cramp.color_ramp.elements[0].color = (0.05, 0.18, 0.55, 1)
+cramp.color_ramp.elements[1].position = 0.68
+cramp.color_ramp.elements[1].color = (0.9, 0.95, 1.0, 1)
+emul = wn.nodes.new("ShaderNodeMixRGB")
+emul.blend_type = "MULTIPLY"
+emul.inputs[0].default_value = 1
+ebg = wn.nodes.new("ShaderNodeBackground")
+ebg.inputs["Strength"].default_value = 1.5
+lp = wn.nodes.new("ShaderNodeLightPath")
+wmix = wn.nodes.new("ShaderNodeMixShader")
+wo = wn.nodes.new("ShaderNodeOutputWorld")
+wn.links.new(tc.outputs["Generated"], sep.inputs[0])
+wn.links.new(sep.outputs["Z"], emask.inputs[0])
+wn.links.new(tc.outputs["Generated"], cn.inputs["Vector"])
+wn.links.new(cn.outputs[0], cramp.inputs[0])
+wn.links.new(cramp.outputs[0], emul.inputs[1])
+wn.links.new(emask.outputs[0], emul.inputs[2])
+warm = wn.nodes.new("ShaderNodeMixRGB")
+warm.blend_type = "MIX"
+warm.inputs[1].default_value = (0.16, 0.11, 0.05, 1)
+wn.links.new(emask.outputs[0], warm.inputs[0])
+wn.links.new(cramp.outputs[0], warm.inputs[2])
+sdot = wn.nodes.new("ShaderNodeVectorMath")
+sdot.operation = "DOT_PRODUCT"
+sdot.inputs[1].default_value = S
+smr = wn.nodes.new("ShaderNodeMapRange")
+smr.inputs[1].default_value = 0.992
+smr.inputs[2].default_value = 1.0
+smr.inputs[4].default_value = 9.0
+spw = wn.nodes.new("ShaderNodeMath")
+spw.operation = "POWER"
+spw.inputs[1].default_value = 3.0
+sadd = wn.nodes.new("ShaderNodeMixRGB")
+sadd.blend_type = "ADD"
+sadd.inputs[0].default_value = 1
+wn.links.new(tc.outputs["Generated"], sdot.inputs[0])
+wn.links.new(sdot.outputs["Value"], smr.inputs[0])
+wn.links.new(smr.outputs[0], spw.inputs[0])
+wn.links.new(warm.outputs[0], sadd.inputs[1])
+wn.links.new(spw.outputs[0], sadd.inputs[2])
+wn.links.new(sadd.outputs[0], ebg.inputs["Color"])
+wn.links.new(lp.outputs["Is Camera Ray"], wmix.inputs[0])
+wn.links.new(ebg.outputs[0], wmix.inputs[1])
+wn.links.new(bg.outputs[0], wmix.inputs[2])
+wn.links.new(wmix.outputs[0], wo.inputs[0])
 
-# Sun lamp + earthshine fill
 sl = bpy.data.lights.new("SunLamp", "SUN")
-sl.energy = 5.5
+sl.energy = 5.0
 sl.angle = math.radians(1.5)
 slo = obj("SunLamp", sl)
 slo.rotation_euler = (-S).to_track_quat("-Z", "Y").to_euler()
-fl = bpy.data.lights.new("Earthshine", "AREA")
-fl.energy = 2500
-fl.size = 30
-fl.color = (0.45, 0.65, 1.0)
-flo = obj("Earthshine", fl, loc=C + Vector((0, 0, -1.9)))
-flo.rotation_euler = (math.pi, 0, 0)
 
 # ---------------------------------------------------------------- Earth
-def dayfac(nt, lo, hi):
-    """0 on the night side, 1 on the day side."""
+def sundot(nt, lo, hi):
+    """Map the surface normal's dot with the Sun direction from [lo, hi] to [0, 1]."""
     geo = nt.nodes.new("ShaderNodeNewGeometry")
     dot = nt.nodes.new("ShaderNodeVectorMath")
     dot.operation = "DOT_PRODUCT"
@@ -255,31 +311,46 @@ def dayfac(nt, lo, hi):
     return mr.outputs[0]
 
 
+def mulc(nt, a, b):
+    n = nt.nodes.new("ShaderNodeMixRGB")
+    n.blend_type = "MULTIPLY"
+    n.inputs[0].default_value = 1
+    nt.links.new(a, n.inputs[1])
+    nt.links.new(b, n.inputs[2])
+    return n.outputs[0]
+
+
 earth_tilt = empty("EarthTilt")
 lat = math.radians(24)
 theta = math.radians(EARTH_LON)
 earth_tilt.rotation_euler = (Matrix.Rotation(-(math.pi / 2 - lat), 3, "Y") @ Matrix.Rotation(-theta, 3, "Z")).to_euler()
 
-em = pbr("Earth", (0.1, 0.2, 0.5), 0.0, 0.65)
+# The Earth is lit in its own shader (emission only) so the fake reflection
+# environment above never tints it.
+em = bpy.data.materials.new("Earth")
+em.use_nodes = True
 nt = em.node_tree
-b = bsdf(em)
+nt.nodes.clear()
 day = nt.nodes.new("ShaderNodeTexImage")
 day.image = bpy.data.images.load(os.path.join(TEX, "earth_day.jpg"))
 night = nt.nodes.new("ShaderNodeTexImage")
 night.image = bpy.data.images.load(os.path.join(TEX, "earth_night.jpg"))
 hsv = nt.nodes.new("ShaderNodeHueSaturation")
-hsv.inputs["Saturation"].default_value = 1.25
-hsv.inputs["Value"].default_value = 1.15
+hsv.inputs["Saturation"].default_value = 1.3
+hsv.inputs["Value"].default_value = 1.9
 nt.links.new(day.outputs[0], hsv.inputs["Color"])
-nt.links.new(hsv.outputs[0], b.inputs["Base Color"])
-df = dayfac(nt, 0.12, -0.2)
-nmul = nt.nodes.new("ShaderNodeMixRGB")
-nmul.blend_type = "MULTIPLY"
-nmul.inputs[0].default_value = 1
-nt.links.new(night.outputs[0], nmul.inputs[1])
-nt.links.new(df, nmul.inputs[2])
-nt.links.new(nmul.outputs[0], b.inputs["Emission Color"])
-b.inputs["Emission Strength"].default_value = 2.5
+lit = mulc(nt, hsv.outputs[0], sundot(nt, -0.05, 0.7))
+dark = mulc(nt, night.outputs[0], sundot(nt, 0.12, -0.2))
+add = nt.nodes.new("ShaderNodeMixRGB")
+add.blend_type = "ADD"
+add.inputs[0].default_value = 1
+nt.links.new(lit, add.inputs[1])
+nt.links.new(dark, add.inputs[2])
+ee = nt.nodes.new("ShaderNodeEmission")
+ee.inputs["Strength"].default_value = 1.0
+eo = nt.nodes.new("ShaderNodeOutputMaterial")
+nt.links.new(add.outputs[0], ee.inputs["Color"])
+nt.links.new(ee.outputs[0], eo.inputs[0])
 bpy.ops.mesh.primitive_uv_sphere_add(segments=128, ring_count=64, radius=R)
 earth = bpy.context.active_object
 earth.name = "Earth"
@@ -287,11 +358,9 @@ for p_ in earth.data.polygons:
     p_.use_smooth = True
 earth.data.materials.append(em)
 earth.parent = earth_tilt
-if earth.name not in col.objects:
-    col.objects.link(earth)
+earth.visible_shadow = False
 
-cm = pbr("Clouds", (1, 1, 1), 0.0, 0.9)
-cm.surface_render_method = "DITHERED"
+cm, cmix = ghost("Clouds", (1, 1, 1), 1.0, 0.0)
 nt = cm.node_tree
 tcn = nt.nodes.new("ShaderNodeTexCoord")
 n1 = nt.nodes.new("ShaderNodeTexNoise")
@@ -301,10 +370,17 @@ n1.inputs["Roughness"].default_value = 0.62
 n1.inputs["Distortion"].default_value = 1.6
 cr = nt.nodes.new("ShaderNodeValToRGB")
 cr.color_ramp.elements[0].position = 0.5
-cr.color_ramp.elements[1].position = 0.72
+cr.color_ramp.elements[1].position = 0.74
+cr.color_ramp.elements[1].color = (0.92, 0.92, 0.92, 1)
 nt.links.new(tcn.outputs["Object"], n1.inputs["Vector"])
 nt.links.new(n1.outputs[0], cr.inputs[0])
-nt.links.new(cr.outputs[0], bsdf(cm).inputs["Alpha"])
+nt.links.new(cr.outputs[0], cmix.inputs[0])
+cem = [n for n in nt.nodes if n.type == "EMISSION"][0]
+clit = nt.nodes.new("ShaderNodeMath")
+clit.operation = "MULTIPLY"
+clit.inputs[1].default_value = 1.7
+nt.links.new(sundot(nt, -0.1, 0.7), clit.inputs[0])
+nt.links.new(clit.outputs[0], cem.inputs["Strength"])
 clouds = obj("Clouds", m_sphere("Clouds", R * 1.006, 128, 64), cm, earth_tilt, shadow=False)
 key(clouds, "rotation_euler", 0, (0, 0, 0))
 key(clouds, "rotation_euler", DUR, (0, 0.02, 0.10))
@@ -316,12 +392,11 @@ lw.inputs["Blend"].default_value = 0.22
 pw = nt.nodes.new("ShaderNodeMath")
 pw.operation = "POWER"
 pw.inputs[1].default_value = 2.2
-df2 = dayfac(nt, -0.25, 0.35)
 mm = nt.nodes.new("ShaderNodeMath")
 mm.operation = "MULTIPLY"
 nt.links.new(lw.outputs["Facing"], pw.inputs[0])
 nt.links.new(pw.outputs[0], mm.inputs[0])
-nt.links.new(df2, mm.inputs[1])
+nt.links.new(sundot(nt, -0.25, 0.35), mm.inputs[1])
 nt.links.new(mm.outputs[0], amix.inputs[0])
 am.use_backface_culling = True
 atmo = obj("Atmo", m_sphere("Atmo", R * 1.03, 96, 48), am, shadow=False)
@@ -372,16 +447,55 @@ nt.links.new(pw.outputs[0], comix.inputs[0])
 obj("Corona", m_sphere("Corona", 84, 64, 32), com, loc=SUNP, shadow=False)
 
 # ---------------------------------------------------------------- shared materials
-M_MIRROR = pbr("Mirror", (1.0, 0.7, 0.2), 1.0, 0.16, (1.0, 0.62, 0.15), 0.55)
-M_BODY = pbr("Body", (0.12, 0.13, 0.16), 0.6, 0.45)
-M_PANEL = pbr("Panel", (0.03, 0.08, 0.35), 0.8, 0.25, (0.05, 0.15, 0.6), 0.15)
-M_EYE = pbr("Eye", (1, 1, 1), 0.0, 0.25, (1, 1, 1), 0.6)
-M_PUPIL = pbr("Pupil", (0.01, 0.01, 0.01), 0.0, 0.2)
-M_CAP = pbr("Cap", (1.0, 0.72, 0.0), 0.0, 0.4, (1.0, 0.6, 0.0), 0.3)
-M_STEEL = pbr("Steel", (0.75, 0.77, 0.8), 1.0, 0.28)
-M_GREY = pbr("Grey", (0.35, 0.35, 0.37), 0.9, 0.5)
-M_FOIL = pbr("Foil", (0.9, 0.6, 0.15), 1.0, 0.35)
-M_WHITE = pbr("White", (0.9, 0.9, 0.92), 0.1, 0.4)
+HOT = (1.0, 0.25, 0.02)
+
+
+def foil(name, color=(1.0, 0.62, 0.18), rough=0.28):
+    """Crinkled multi-layer insulation."""
+    m = pbr(name, color, 1.0, rough, HOT, 0.0)
+    nt_ = m.node_tree
+    t = nt_.nodes.new("ShaderNodeTexCoord")
+    n = nt_.nodes.new("ShaderNodeTexNoise")
+    n.inputs["Scale"].default_value = 7
+    n.inputs["Detail"].default_value = 3
+    n.inputs["Roughness"].default_value = 0.7
+    bp = nt_.nodes.new("ShaderNodeBump")
+    bp.inputs["Strength"].default_value = 0.4
+    bp.inputs["Distance"].default_value = 0.03
+    nt_.links.new(t.outputs["Object"], n.inputs["Vector"])
+    nt_.links.new(n.outputs[0], bp.inputs["Height"])
+    nt_.links.new(bp.outputs[0], bsdf(m).inputs["Normal"])
+    return m
+
+
+def cells(name, c1=(0.004, 0.012, 0.09), c2=(0.008, 0.025, 0.16), scale=9.0):
+    """Solar cells: a dark glassy grid with silver bus lines."""
+    m = pbr(name, c1, 0.5, 0.12, HOT, 0.0)
+    nt_ = m.node_tree
+    t = nt_.nodes.new("ShaderNodeTexCoord")
+    br = nt_.nodes.new("ShaderNodeTexBrick")
+    br.offset = 0.0
+    br.inputs["Color1"].default_value = (*c1, 1)
+    br.inputs["Color2"].default_value = (*c2, 1)
+    br.inputs["Mortar"].default_value = (0.55, 0.57, 0.62, 1)
+    br.inputs["Scale"].default_value = scale
+    br.inputs["Mortar Size"].default_value = 0.035
+    br.inputs["Brick Width"].default_value = 1.0
+    br.inputs["Row Height"].default_value = 0.5
+    nt_.links.new(t.outputs["Object"], br.inputs["Vector"])
+    nt_.links.new(br.outputs["Color"], bsdf(m).inputs["Base Color"])
+    return m
+
+
+M_MIRROR = pbr("Mirror", (1.0, 0.74, 0.3), 1.0, 0.05, (1.0, 0.6, 0.18), 0.18)
+M_FRAME = pbr("Frame", (0.025, 0.025, 0.03), 0.3, 0.45)
+M_PANEL = cells("Panel")
+M_STEEL = pbr("Steel", (0.75, 0.77, 0.8), 1.0, 0.25)
+M_GREY = pbr("Grey", (0.3, 0.3, 0.32), 0.9, 0.45)
+M_NOZZLE = pbr("Nozzle", (0.08, 0.07, 0.07), 1.0, 0.35)
+M_FOIL = foil("Foil")
+M_SILVER = foil("SilverFoil", (0.8, 0.82, 0.86), 0.22)
+M_WHITE = pbr("White", (0.88, 0.88, 0.9), 0.0, 0.45)
 M_SPARK = glow("Spark", (1.0, 0.55, 0.15), 14)
 M_FLASH = glow("Flash", (1.0, 0.9, 0.7), 40)
 M_TAG = glow("Tag", (0.4, 1.0, 0.6), 3.0)
@@ -389,6 +503,16 @@ M_TAGR = glow("TagRed", (1.0, 0.25, 0.2), 4.0)
 M_TAGW = glow("TagWhite", (1.0, 1.0, 1.0), 3.0)
 
 RX = Matrix.Rotation(-math.pi / 2, 4, "X")       # +Z -> +Y
+ME_STRUT = m_cone("Strut", 1.0, 1.0, 1.0, 10)
+
+
+def strut(parent, p0, p1, r, mat):
+    p0, p1 = Vector(p0), Vector(p1)
+    d = p1 - p0
+    o = obj("strut", ME_STRUT, mat, parent, loc=(p0 + p1) / 2, scale=(r, r, d.length))
+    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+    return o
+
 
 # ---------------------------------------------------------------- camera
 camd = bpy.data.cameras.new("Cam")
@@ -425,19 +549,57 @@ def tag(text, loc, ranges, mat=M_TAG, size=0.34):
     return o
 
 
-# ---------------------------------------------------------------- burst helper
-FRAGS = [m_ico("Frag%d" % i, 1.0, 1, 0.45, smooth=False) for i in range(5)]
+# ---------------------------------------------------------------- junk pieces + burst helper
+def _m_shard(name):
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts:
+        v.co.x *= 2.0 * random.uniform(0.6, 1.0)
+        v.co.y *= 1.4 * random.uniform(0.5, 1.0)
+        v.co.z *= 0.05
+    return mesh_from_bm(name, bm, False)
 
 
-def burst(center, t, n, mats, dmin, dmax, life, smin=0.04, smax=0.16, end=None, cone=None):
+def _m_scrap(name):
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=7, y_segments=7, size=0.9)
+    for v in bm.verts:
+        v.co.z = 0.28 * math.sin(v.co.x * 5 + random.uniform(-1, 1)) * math.cos(v.co.y * 4) + random.uniform(-0.08, 0.08)
+    return mesh_from_bm(name, bm, True)
+
+
+def _m_bolt(name):
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=0.7, radius2=0.7, depth=0.4)
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.32, radius2=0.32, depth=1.5,
+                          matrix=Matrix.Translation((0, 0, -0.9)))
+    return mesh_from_bm(name, bm, False)
+
+
+CHUNKS = [m_ico("Chunk%d" % i, 1.0, 2, 0.32, smooth=True) for i in range(3)]
+JUNK = [
+    (_m_shard("ShardA"), M_PANEL), (_m_shard("ShardB"), M_PANEL), (_m_shard("ShardC"), M_STEEL),
+    (_m_scrap("ScrapA"), M_FOIL), (_m_scrap("ScrapB"), M_FOIL), (_m_scrap("ScrapC"), M_SILVER),
+    (_m_bolt("Bolt"), M_STEEL),
+    (m_cone("Rod", 0.07, 0.07, 2.4, 10), M_GREY),
+    (m_sphere("Tank", 0.75, 24, 12), M_WHITE),
+    (CHUNKS[0], M_GREY), (CHUNKS[1], M_NOZZLE),
+]
+
+
+def burst(center, t, n, sparks, dmin, dmax, life, smin=0.04, smax=0.16, end=None):
+    """n pieces fly out from center at time t. `sparks` is the share that glows."""
     center = Vector(center)
     for i in range(n):
         d = Vector((random.gauss(0, 1), random.gauss(0, 1), random.gauss(0, 1))).normalized()
-        if cone is not None:
-            d = (d + Vector(cone)).normalized()
         dist = random.uniform(dmin, dmax)
         s = random.uniform(smin, smax)
-        o = obj("B", random.choice(FRAGS), random.choice(mats), shadow=False)
+        if random.random() < sparks:
+            me, mat = random.choice(CHUNKS), random.choice((M_SPARK, M_SPARK, M_FLASH))
+            s *= 0.16
+        else:
+            me, mat = random.choice(JUNK)
+        o = obj("B", me, mat, shadow=False)
         key(o, "scale", 0, (0, 0, 0), "CONSTANT")
         key(o, "scale", t, (s, s, s), "LINEAR")
         key(o, "location", t, center)
@@ -459,61 +621,90 @@ def flash(center, t, size):
     key(o, "scale", t + 0.45, (0, 0, 0), "LINEAR")
     ld = bpy.data.lights.new("FlashL", "POINT")
     ld.color = (1.0, 0.8, 0.5)
-    lo = obj("FlashL", ld, loc=center)
+    obj("FlashL", ld, loc=center)
     key(ld, "energy", 0, 0.0, "CONSTANT")
     key(ld, "energy", t - 0.04, 0.0)
-    key(ld, "energy", t + 0.08, 60000.0)
+    key(ld, "energy", t + 0.08, 9000.0)
     key(ld, "energy", t + 0.6, 0.0)
 
 
-# ---------------------------------------------------------------- assets
+# ---------------------------------------------------------------- big assets
+ME_BUS = m_box("Bus", 0.8, 0.8, 1.1, bevel=0.035)
+ME_SPAN = m_box("SolarPanel", 0.56, 0.5, 0.02, bevel=0.006)
+ME_DISH = m_cone("Dish", 0.05, 0.52, 0.2, 40)
+ME_FEED = m_cone("Feed", 0.05, 0.035, 0.1, 16)
+ME_INSTR = m_cone("Instr", 0.13, 0.13, 0.36, 24, bevel=0.012)
+ME_BELL = m_cone("Bell", 0.07, 0.17, 0.2, 28)
+PX = (math.pi / 2, 0, 0)
+
+
 def junk_sat(name, mat_body=M_FOIL, mat_panel=M_PANEL, broken=True, parent=None):
+    """A communications satellite: foil bus, two three-panel wings, dish, booms."""
     root = empty(name, parent=parent)
-    obj(name + "_b", m_box("jb", 0.7, 0.7, 0.9), mat_body, root)
-    obj(name + "_p1", m_box("jp", 1.5, 0.04, 0.6), mat_panel, root, loc=(1.15, 0, 0))
-    if broken:
-        obj(name + "_p2", m_box("jp2", 0.9, 0.04, 0.6), mat_panel, root, loc=(-0.8, 0.1, 0.25), rot=(0.4, 0.9, 0.5))
-    else:
-        obj(name + "_p2", m_box("jp", 1.5, 0.04, 0.6), mat_panel, root, loc=(-1.15, 0, 0))
-    obj(name + "_d", m_cone("jd", 0.05, 0.38, 0.22, 20), M_WHITE, root, loc=(0, 0, 0.58))
-    obj(name + "_a", m_cone("ja", 0.015, 0.015, 0.7, 6), M_GREY, root, loc=(0.2, 0.2, -0.75))
+    obj(name + "_bus", ME_BUS, mat_body, root)
+    obj(name + "_deck", m_box("Deck", 0.84, 0.84, 0.04, bevel=0.01), M_FRAME, root, loc=(0, 0, 0.56))
+    obj(name + "_dish", ME_DISH, M_WHITE, root, loc=(0, 0, 0.72))
+    obj(name + "_feed", ME_FEED, M_STEEL, root, loc=(0, 0, 1.08))
+    for k in range(3):
+        a = k * 2.094
+        strut(root, (0.45 * math.cos(a), 0.45 * math.sin(a), 0.8), (0, 0, 1.06), 0.008, M_STEEL)
+    obj(name + "_instr", ME_INSTR, M_SILVER, root, loc=(0.18, 0.5, 0.1), rot=PX)
+    obj(name + "_bell", ME_BELL, M_NOZZLE, root, loc=(0, 0, -0.64))
+    strut(root, (-0.3, -0.3, -0.55), (-0.55, -0.6, -1.35), 0.012, M_GREY)
+    strut(root, (0.3, -0.35, 0.5), (0.5, -1.2, 0.75), 0.01, M_GREY)
+    for sx in (-1, 1):
+        strut(root, (sx * 0.4, 0, 0), (sx * 0.62, 0, 0), 0.02, M_STEEL)
+        for k in range(3):
+            x = sx * (0.92 + k * 0.6)
+            if broken and sx < 0:
+                if k == 2:
+                    continue
+                if k == 1:
+                    obj(name + "_pb", ME_SPAN, mat_panel, root, loc=(x + 0.1, 0.22, 0.12), rot=(1.2, 0.5, 0.7))
+                    continue
+            rot = PX if not (broken and sx > 0 and k == 2) else (1.95, 0.25, 0.0)
+            obj(name + "_p", ME_SPAN, mat_panel, root, loc=(x, 0, 0 if rot == PX else 0.1), rot=rot)
+            strut(root, (x - 0.28, 0.012, 0.27), (x + 0.28, 0.012, 0.27), 0.006, M_STEEL)
+            strut(root, (x - 0.28, 0.012, -0.27), (x + 0.28, 0.012, -0.27), 0.006, M_STEEL)
     return root
 
 
 def rocket(name, mat):
+    """A spent upper stage."""
     root = empty(name)
-    obj(name + "_body", m_cone("rb", 0.36, 0.36, 2.4, 32), mat, root)
-    obj(name + "_nose", m_cone("rn", 0.36, 0.02, 0.9, 32), mat, root, loc=(0, 0, 1.65))
-    obj(name + "_band", m_cone("rband", 0.365, 0.365, 0.25, 32), M_BODY, root, loc=(0, 0, 0.9))
-    for i in range(3):
-        a = i * 2 * math.pi / 3
-        obj(name + "_fin", m_box("rf", 0.5, 0.04, 0.7), M_BODY, root,
-            loc=(0.45 * math.cos(a), 0.45 * math.sin(a), -1.0), rot=(0, 0, a))
-    fm, _ = ghost(name + "_flame", (0.5, 0.75, 1.0), 14, 0.7)
-    obj(name + "_flame", m_cone("rfl", 0.02, 0.3, 1.6, 20), fm, root, loc=(0, 0, -2.0), shadow=False)
+    obj(name + "_tank", m_cone("StageTank", 0.36, 0.36, 2.2, 40), mat, root)
+    obj(name + "_dome", m_sphere("StageDome", 0.36, 32, 16), mat, root, loc=(0, 0, 1.1), scale=(1, 1, 0.45))
+    for z in (-0.9, -0.2, 0.5, 1.0):
+        obj(name + "_ring", m_cone("StageRing", 0.372, 0.372, 0.05, 40), M_STEEL, root, loc=(0, 0, z))
+    obj(name + "_skirt", m_cone("StageSkirt", 0.3, 0.365, 0.25, 40), M_FRAME, root, loc=(0, 0, -1.22))
+    obj(name + "_bell", m_cone("StageBell", 0.3, 0.1, 0.55, 40), M_NOZZLE, root, loc=(0, 0, -1.6))
+    for k in range(4):
+        a = k * math.pi / 2 + 0.6
+        obj(name + "_btl", m_sphere("Bottle", 0.09, 16, 10), M_SILVER, root,
+            loc=(0.24 * math.cos(a), 0.24 * math.sin(a), -1.28))
     return root
 
 
 # debris field (shots B, C)
 field = empty("Field", loc=C)
 vis(field, [(8, 24)])
-fmats = [M_GREY, M_GREY, M_FOIL, M_PANEL, M_STEEL]
 for i in range(170):
     p = Vector((random.uniform(-11, 16), random.uniform(-6, 7), random.uniform(-1.4, 3.2)))
-    s = random.uniform(0.03, 0.22) * (2.2 if random.random() < 0.06 else 1)
-    o = obj("F", random.choice(FRAGS), random.choice(fmats), field, loc=p, scale=s)
+    s = random.uniform(0.04, 0.2) * (2.0 if random.random() < 0.06 else 1)
+    me, mat = random.choice(JUNK)
+    o = obj("F", me, mat, field, loc=p, scale=s)
     v = Vector((random.uniform(-0.25, 0.1), random.uniform(-0.05, 0.05), random.uniform(-0.03, 0.03)))
     key(o, "location", 8, p)
     key(o, "location", 24, p + v * 16)
-    key(o, "rotation_euler", 8, (0, 0, 0))
-    key(o, "rotation_euler", 24, tuple(random.uniform(-14, 14) for _ in range(3)))
+    key(o, "rotation_euler", 8, tuple(random.uniform(-3, 3) for _ in range(3)))
+    key(o, "rotation_euler", 24, tuple(random.uniform(-10, 10) for _ in range(3)))
 dead0 = junk_sat("DeadB", parent=field)
 key(dead0, "location", 8, Vector((-2.5, 1.2, 0.9)))
 key(dead0, "location", 17, Vector((-6.2, -0.3, 1.25)))
 key(dead0, "rotation_euler", 8, (0.3, 0.2, 0))
 key(dead0, "rotation_euler", 17, (2.4, 1.4, 1.1))
 key(dead0, "scale", 17, (0, 0, 0), "CONSTANT")
-stage_j = rocket("OldStage", M_GREY)
+stage_j = rocket("OldStage", M_WHITE)
 stage_j.parent = field
 key(stage_j, "location", 8, Vector((7, 3.5, 1.6)))
 key(stage_j, "location", 17, Vector((5.2, 3.2, 1.5)))
@@ -524,7 +715,7 @@ key(stage_j, "scale", 17, (0, 0, 0), "CONSTANT")
 # collision (shot C)
 HC = C + Vector((4, 0, 1))
 TC_ = 19.6
-x1 = rocket("X1", M_GREY)
+x1 = rocket("X1", M_WHITE)
 vis(x1, [(17, TC_)])
 key(x1, "location", 17, HC + Vector((-7.5, -1.6, 0.5)))
 key(x1, "location", TC_, HC + Vector((-0.3, 0, 0)))
@@ -537,60 +728,73 @@ key(x2, "location", TC_, HC + Vector((0.3, 0, 0)))
 key(x2, "rotation_euler", 17, (0, 0, 0))
 key(x2, "rotation_euler", TC_, (1.0, 0.5, 2.0))
 flash(HC, TC_, 2.6)
-burst(HC, TC_, 150, [M_GREY, M_FOIL, M_PANEL, M_STEEL, M_SPARK], 2.5, 14, 4.4, 0.03, 0.2, end=24)
+burst(HC, TC_, 170, 0.25, 2.5, 14, 4.4, 0.03, 0.2, end=24)
 
 # ---------------------------------------------------------------- the janitors
 FC = C + Vector((-5, 0, 0.6))
 aim = empty("Aim")
-ME_MIR = m_cone("Mir", 0.45, 0.45, 0.05, 6, RX, smooth=False)
-ME_RIM = m_cone("Rim", 0.49, 0.49, 0.035, 6, RX, smooth=False)
-ME_BODY = m_box("SatBody", 0.3, 0.22, 0.3)
-ME_WING = m_box("Wing", 0.3, 0.02, 0.16)
-ME_EYE = m_sphere("EyeM", 0.115, 20, 12)
-ME_PUP = m_sphere("PupM", 0.06, 16, 10)
+SEG_R = 0.2
+ME_SEG = m_cone("MirrorSeg", SEG_R, SEG_R, 0.022, 6, RX, smooth=False, bevel=0.004)
+ME_BACK = m_cone("Backplane", 0.57, 0.57, 0.02, 48, RX, smooth=False)
+ME_HUB = m_cone("Hub", 0.09, 0.06, 0.1, 24, RX)
+ME_SBUS = m_box("SatBus", 0.26, 0.24, 0.26, bevel=0.012)
+ME_WING = m_box("SatWing", 0.62, 0.3, 0.012, bevel=0.004)
+ME_THR = m_cone("Thruster", 0.03, 0.012, 0.05, 16, RX)
+ME_ANT = m_cone("Antenna", 0.1, 0.015, 0.05, 24, RX)
+ME_TRK = m_cone("Tracker", 0.03, 0.03, 0.09, 16, bevel=0.004)
 ME_BEAM = m_cone("BeamM", 0.13, 0.015, 1.0, 20, RX @ Matrix.Translation((0, 0, 0.5)), caps=False)
 M_BEAM, beam_mix = ghost("Beam", (1.0, 0.82, 0.45), 9, 0.0)
+SEG_D = SEG_R * math.sqrt(3) + 0.014
+SEGS = [(0.0, 0.0)] + [(SEG_D * math.cos(math.radians(60 * k)), SEG_D * math.sin(math.radians(60 * k)))
+                       for k in range(6)]
 
-sats, eyes, pupils = [], [], []
-pos = [(0, 0)]
-for ring, n in ((1, 6), (2, 12)):
-    for k in range(n):
-        a = 2 * math.pi * k / n + (0.26 if ring == 2 else 0)
-        pos.append((ring * 1.3 * math.cos(a), ring * 1.3 * math.sin(a) * 0.9))
-for i, (py, pz) in enumerate(pos):
-    lead = i == 0
-    r2 = py * py + pz * pz
-    home = FC + Vector((0.07 * r2, py, pz))
-    root = empty("Sat%d" % i, loc=home)
-    root["home"] = home
+
+def janitor(name, loc):
+    """One mirror satellite: 7 gold mirror segments, truss, foil bus, two solar wings.
+    The mirror faces local +Y."""
+    root = empty(name, loc=loc)
+    for x, z in SEGS:
+        obj("seg", ME_SEG, M_MIRROR, root, loc=(x, 0, z))
+    obj("back", ME_BACK, M_FRAME, root, loc=(0, -0.03, 0))
+    obj("hub", ME_HUB, M_FRAME, root, loc=(0, -0.09, 0))
+    by = -0.5
+    for k in range(3):
+        a = math.radians(90 + 120 * k)
+        strut(root, (0.42 * math.cos(a), -0.04, 0.42 * math.sin(a)), (0.1 * math.cos(a), by + 0.1, 0.1 * math.sin(a)), 0.011, M_FRAME)
+    obj("bus", ME_SBUS, M_FOIL, root, loc=(0, by, 0))
+    for sx in (-1, 1):
+        strut(root, (sx * 0.13, by, 0), (sx * 0.27, by, 0), 0.012, M_STEEL)
+        obj("wing", ME_WING, M_PANEL, root, loc=(sx * 0.58, by, 0), rot=PX)
+        for sz in (-1, 1):
+            obj("thr", ME_THR, M_NOZZLE, root, loc=(sx * 0.1, by - 0.14, sz * 0.1))
+    obj("ant", ME_ANT, M_WHITE, root, loc=(0, by - 0.15, 0))
+    obj("trk", ME_TRK, M_FRAME, root, loc=(0.06, by, 0.17))
+    strut(root, (-0.08, by, 0.13), (-0.14, by - 0.05, 0.42), 0.005, M_STEEL)
     c = root.constraints.new("TRACK_TO")
     c.target = aim
     c.track_axis = "TRACK_Y"
     c.up_axis = "UP_Z"
-    obj("mir", ME_MIR, M_MIRROR, root)
-    obj("rim", ME_RIM, M_BODY, root, loc=(0, -0.02, 0))
-    obj("body", ME_BODY, M_BODY, root, loc=(0, -0.15, 0))
-    obj("w1", ME_WING, M_PANEL, root, loc=(0.6, -0.12, 0))
-    obj("w2", ME_WING, M_PANEL, root, loc=(-0.6, -0.12, 0))
-    for sx in (-1, 1):
-        e = obj("eye", ME_EYE, M_EYE, root, loc=(sx * 0.16, 0.06, 0.07), shadow=False)
-        p = obj("pup", ME_PUP, M_PUPIL, root, loc=(sx * 0.15, 0.17, 0.065), shadow=False)
-        eyes.append(e)
-        pupils.append(p)
-    if lead:
-        obj("cap", m_sphere("CapM", 0.3, 24, 12), M_CAP, root, loc=(0, -0.02, 0.36), scale=(1, 0.8, 0.55))
-        obj("brim", m_cone("BrimM", 0.3, 0.3, 0.03, 24), M_CAP, root, loc=(0, 0.2, 0.33), scale=(0.9, 0.6, 1))
-        # mop
-        obj("mop", m_cone("MopS", 0.018, 0.018, 1.1, 8), M_WHITE, root, loc=(0.78, 0.02, 0.1), rot=(0, 0.25, 0))
-        obj("moph", m_box("MopH", 0.26, 0.1, 0.16), M_CAP, root, loc=(0.92, 0.02, 0.66), rot=(0, 0.25, 0))
-    sc = 1.5 if lead else 1.0
-    if lead:
-        vis(root, [(24, DUR + 1)], sc)
+    return root
+
+
+sats = []
+pos = [(0, 0)]
+for ring, n in ((1, 6), (2, 12)):
+    for k in range(n):
+        a = 2 * math.pi * k / n + (0.26 if ring == 2 else 0)
+        pos.append((ring * 1.42 * math.cos(a), ring * 1.42 * math.sin(a) * 0.92))
+for i, (py, pz) in enumerate(pos):
+    r2 = py * py + pz * pz
+    home = FC + Vector((0.06 * r2, py, pz))
+    root = janitor("Sat%d" % i, home)
+    root["home"] = home
+    if i == 0:
+        vis(root, [(24, DUR + 1)])
     else:
         t0 = 30.3 + 0.11 * i
         key(root, "scale", 0, (0, 0, 0), "CONSTANT")
         key(root, "scale", t0, (0.15,) * 3, "BEZIER")
-        key(root, "scale", t0 + 1.7, (sc,) * 3, "BEZIER")
+        key(root, "scale", t0 + 1.7, (1,) * 3, "BEZIER")
         key(root, "location", t0, FC + Vector((-4.5, 0, -0.3)), "BEZIER")
         key(root, "location", t0 + 1.7, home, "BEZIER")
     bm_ = obj("beam", ME_BEAM, M_BEAM, shadow=False)
@@ -603,22 +807,9 @@ for i, (py, pz) in enumerate(pos):
     sats.append(root)
 
 # ---------------------------------------------------------------- targets
-RK0 = C + Vector((6, 0.3, -5.5))
-RK1 = C + Vector((6, 0.3, 7.0))
-M_RK = pbr("RocketSkin", (0.8, 0.82, 0.86), 1.0, 0.22, (1.0, 0.15, 0.02), 0.0)
-rk = rocket("NewRocket", M_RK)
-vis(rk, [(30, 47.5)])
-key(rk, "location", 30, RK0)
-key(rk, "location", 47.5, RK1)
-
-
-def rkpos(t):
-    return RK0.lerp(RK1, (t - 30) / 17.5)
-
-
 DP = C + Vector((6.2, -0.2, -0.2))
-M_HOT = pbr("HotFoil", (0.9, 0.6, 0.15), 1.0, 0.35, (1.0, 0.25, 0.02), 0.0)
-M_HOTP = pbr("HotPanel", (0.03, 0.08, 0.35), 0.8, 0.25, (1.0, 0.25, 0.02), 0.0)
+M_HOT = foil("HotFoil")
+M_HOTP = cells("HotPanel")
 dead = junk_sat("Dead", M_HOT, M_HOTP)
 dead.location = DP
 TV = 54.5
@@ -628,8 +819,8 @@ key(dead, "rotation_euler", 30, (0.4, 0.2, 0))
 key(dead, "rotation_euler", 60, (1.6, 2.4, 1.2))
 
 RP = C + Vector((6.2, 0, 0.5))
-M_RIV = pbr("RivalSkin", (0.92, 0.92, 0.95), 0.3, 0.3, (1.0, 0.25, 0.02), 0.0)
-M_RIVP = pbr("RivalPanel", (0.5, 0.05, 0.4), 0.8, 0.25, (1.0, 0.25, 0.02), 0.0)
+M_RIV = pbr("RivalSkin", (0.9, 0.9, 0.93), 0.2, 0.3, HOT, 0.0)
+M_RIVP = cells("RivalPanel", (0.09, 0.004, 0.07), (0.16, 0.008, 0.12))
 rival = junk_sat("Rival", M_RIV, M_RIVP, broken=False)
 rival.location = RP
 TR = 81.4
@@ -638,24 +829,21 @@ key(rival, "scale", TR, (1, 1, 1), "LINEAR")
 key(rival, "rotation_euler", 72, (0.15, 0, 0.3))
 key(rival, "rotation_euler", 84, (0.15, 0, 1.0))
 
-# aim choreography
+# where the swarm points
 AIM_D = FC + Vector((4.0, 1.9, 2.3))
 key(aim, "location", 0, AIM_D)
-key(aim, "location", 35.3, AIM_D)
-key(aim, "location", 36.8, rkpos(36.8))
-key(aim, "location", 43.4, rkpos(43.4))
-key(aim, "location", 45.0, rkpos(43.4))
-key(aim, "location", 46.4, DP)
+key(aim, "location", 41.6, AIM_D)
+key(aim, "location", 44.2, DP, "BEZIER")
 key(aim, "location", 71.9, DP)
 key(aim, "location", 72.0, AIM_D, "CONSTANT")
 key(aim, "location", 72.6, AIM_D)
 key(aim, "location", 74.0, RP)
 key(aim, "location", 82.2, RP)
 key(aim, "location", 83.1, FC + Vector((3, -2, 14)))
-key(aim, "location", 84.0, FC + Vector((9.5, 3.2, 3.1)), "CONSTANT")
+key(aim, "location", 84.0, FC + Vector((12.5, 4.3, 3.4)), "CONSTANT")
 
 # beams + hot spot
-BEAMS = [(38.4, 42.7), (47.4, TV + 0.25), (79.4, TR + 0.2)]
+BEAMS = [(47.4, TV + 0.25), (79.4, TR + 0.2)]
 hot = obj("Hot", m_ico("HotM", 1.0, 3), glow("HotMat", (1.0, 0.85, 0.5), 30), shadow=False)
 hc = hot.constraints.new("COPY_LOCATION")
 hc.target = aim
@@ -682,31 +870,30 @@ for a, b_ in BEAMS:
     key(hl, "energy", b_, 0.0)
 
 
-def heat(mats, a, b_, peak, cool=None):
+def heat(mats, a, b_, peak):
     for m in mats:
         s = bsdf(m).inputs["Emission Strength"]
         c_ = bsdf(m).inputs["Emission Color"]
         keyin(s, a, 0.0)
+        keyin(s, (a + b_) / 2, peak * 0.12)
         keyin(s, b_, peak)
-        keyin(c_, a, (1.0, 0.15, 0.02, 1))
-        keyin(c_, b_, (1.0, 0.75, 0.45, 1) if peak > 5 else (1.0, 0.2, 0.03, 1))
-        if cool:
-            keyin(s, cool, 0.0)
+        keyin(c_, a, (1.0, 0.12, 0.01, 1))
+        keyin(c_, (a + b_) / 2, (1.0, 0.3, 0.04, 1))
+        keyin(c_, b_, (1.0, 0.75, 0.45, 1))
 
 
-heat([M_RK], 38.6, 42.7, 0.7, cool=45.5)
 heat([M_HOT, M_HOTP], 47.6, TV, 30)
 heat([M_RIV, M_RIVP], 79.6, TR, 30)
 
 # vaporize + fireball
 flash(DP, TV, 1.1)
-burst(DP, TV, 110, [M_SPARK, M_SPARK, M_FLASH], 1.0, 5.0, 1.5, 0.03, 0.12)
+burst(DP, TV, 120, 0.8, 1.0, 5.0, 1.5, 0.03, 0.12)
 FB0, FB1 = DP, C + Vector((15.5, 1.5, -2.05))
 fb = empty("Fireball")
 obj("fbh", m_ico("FBH", 0.22, 3), M_FLASH, fb, shadow=False)
 trm, _ = ghost("Trail", (1.0, 0.5, 0.12), 12, 0.55)
 d = (FB1 - FB0).normalized()
-tr_ = obj("fbt", m_cone("FBT", 0.01, 0.2, 2.6, 16, Matrix.Translation((0, 0, -1.3))), trm, fb, shadow=False)
+obj("fbt", m_cone("FBT", 0.01, 0.2, 2.6, 16, Matrix.Translation((0, 0, -1.3))), trm, fb, shadow=False)
 fb.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
 vis(fb, [(TV + 0.5, 59.6)])
 key(fb, "location", TV + 0.5, FB0)
@@ -721,26 +908,7 @@ def fbpos(t):
 
 
 flash(RP, TR, 1.2)
-burst(RP, TR, 120, [M_SPARK, M_SPARK, M_FLASH, M_WHITE], 1.0, 6.0, 1.8, 0.03, 0.13)
-
-# emotions
-for p in pupils:
-    key(p, "scale", 0, (1, 1, 1))
-    for t, v in ((42.75, 1), (42.95, 0.5), (44.9, 0.5), (45.3, 1)):
-        key(p, "scale", t, (v, v, v))
-    for t, v in ((75.9, 1), (76.3, 0.35), (81.2, 0.35), (81.6, 1)):
-        key(p, "scale", t, (1, 1, v))
-for e in eyes:
-    key(e, "scale", 0, (1, 1, 1))
-    for t, v in ((42.75, 1), (42.95, 1.0), (44.9, 1.0), (45.3, 1)):
-        key(e, "scale", t, (v, v, v))
-    for t, v in ((75.9, 1), (76.3, 0.35), (81.2, 0.35), (81.6, 1)):
-        key(e, "scale", t, (1, 1, v))
-for e in eyes[:2] + pupils[:2]:      # leader blinks
-    for bt in (26.2, 28.4, 87.0):
-        key(e, "scale", bt - 0.08, (1, 1, 1))
-        key(e, "scale", bt, (1, 1, 0.08))
-        key(e, "scale", bt + 0.1, (1, 1, 1))
+burst(RP, TR, 130, 0.7, 1.0, 6.0, 1.8, 0.03, 0.13)
 
 # ---------------------------------------------------------------- constellation
 shell = empty("Shell")
@@ -791,15 +959,15 @@ while n < 16:
     n += 1
 
 # ---------------------------------------------------------------- tags
-tag("TARGET: TRASH (97% sure)", rkpos(39.5) + Vector((0, 0, 2.45)), [(38.0, 40.5)])
-tag("WAIT. THAT ROCKET IS BRAND NEW.", rkpos(41.8) + Vector((0, 0, 2.5)), [(40.5, 43.0)], M_TAGR)
-tag("DEAD SINCE 2009", DP + Vector((0, 0, 1.0)), [(45.0, 54.3)], M_TAG)
-tag("CLEANED.", DP + Vector((0, 0, 0.3)), [(55.2, 55.5)], M_TAG, 0.5)
-tag("RIVAL CORP", RP + Vector((0, 0, 1.3)), [(72, 81.3)], M_TAGW, 0.42)
+tag("TARGET LOCKED", DP + Vector((0, 0, 1.95)), [(44.4, 47.2)], M_TAG, 0.2)
+tag("DEAD SINCE 2009", DP + Vector((0, 0, 1.55)), [(44.4, 54.3)], M_TAG, 0.26)
+tag("CLEANED.", DP + Vector((0, 0, 0.6)), [(55.6, 58.0)], M_TAG, 0.3)
+tag("RIVAL CORP", RP + Vector((0, 0, 1.7)), [(72, 81.3)], M_TAGW, 0.42)
 tag("oops.", RP + Vector((0, 0, 0.2)), [(82.0, 84.0)], M_TAGR, 0.5)
 
 # ---------------------------------------------------------------- shots
 V = Vector
+H3 = Vector(sats[3]["home"])
 # A1 the Sun
 shot(0, 3.5, SUNP - S * 330 + V((40, 60, 10)), SUNP - S * 270 + V((20, 40, 5)), SUNP + V((0, 30, 0)), SUNP, 35)
 # A2 Earth, rockets leaving
@@ -808,34 +976,30 @@ shot(3.5, 8, camdir_a * 92, camdir_a * 80 + V((0, 6, 0)), V((0, 0, 3)), V((0, 0,
 shot(8, 17, C + V((-13, -3, 1.3)), C + V((-6, -1.6, 1.0)), C + V((8, 1, -0.6)), C + V((8, 1.5, -0.4)), 26)
 # C collision
 shot(17, 24, HC + V((-1, -10, 1.6)), HC + V((0.5, -7.5, 1.2)), HC + V((0, 0, -0.5)), HC + V((0, 0, -0.3)), 30)
-# D meet the janitor
-shot(24, 30, FC + V((4.6, 2.2, 2.7)), FC + V((3.6, 1.7, 2.2)), FC + V((0, 0, -0.1)), FC + V((0, 0, 0.0)), 40)
-# E deploy
+# D the first janitor, alone
+shot(24, 30, FC + V((3.0, 2.3, 1.9)), FC + V((2.2, 1.2, 1.5)), FC + V((0, 0, -0.25)), FC + V((0, 0, -0.2)), 40)
+# E the swarm deploys
 shot(30, 37, FC + V((5.5, -6.5, 3.2)), FC + V((6.5, -5.0, 2.6)), FC + V((-0.5, 0, 0)), FC + V((0, 0, 0)), 30)
-# F1 over the shoulder: wrong target
-shot(37, 40.5, C + V((12.5, -6.5, 2.8)), C + V((11.8, -6.0, 2.6)), C + V((2.0, 0, 0.9)), C + V((2.0, 0, 1.2)), 28)
-# F2 the rocket, sweating
-shot(40.5, 43, rkpos(40.5) + V((4.2, -7.0, 1.0)), rkpos(43) + V((3.8, -6.4, 0.8)), rkpos(40.5) + V((0, 0, 1.3)), rkpos(43) + V((0, 0, 1.3)), 35)
-# F3 leader: shock
-shot(43, 45, FC + V((5.6, -1.6, 1.3)), FC + V((5.2, -1.5, 1.2)), FC + V((0, 0, 0.1)), FC + V((0, 0, 0.1)), 42)
-# F4 wide: turn to the real trash
-shot(45, 47, C + V((0.5, -13, 2.4)), C + V((0.5, -12.6, 2.3)), C + V((0.6, 0, 0.2)), C + V((0.6, 0, 0.2)), 30)
+# F1 close on one mirror satellite
+shot(37, 41.2, H3 + V((1.7, -1.5, 0.75)), H3 + V((1.5, 0.9, 0.5)), H3 + V((0, 0, -0.1)), H3 + V((0, 0, -0.05)), 45)
+# F2 wide: the swarm turns to the dead satellite
+shot(41.2, 47, C + V((0.5, -13.4, 2.5)), C + V((0.5, -12.6, 2.3)), C + V((0.6, 0, 0.2)), C + V((0.6, 0, 0.2)), 30)
 # G1 wide: beams on
 shot(47, 51, C + V((0.5, -12.6, 2.3)), C + V((1.5, -10.5, 1.9)), C + V((0.6, 0, 0.2)), C + V((1.2, 0, 0.1)), 30)
 # G2 close on the dead satellite
-shot(51, 55.5, DP + V((3.6, -5.2, 1.1)), DP + V((3.0, -4.2, 0.9)), DP + V((0, 0, 0.3)), DP + V((0, 0, 0.3)), 35)
+shot(51, 55.5, DP + V((3.9, -5.6, 1.3)), DP + V((3.2, -4.5, 1.0)), DP + V((0, 0, 0.3)), DP + V((0, 0, 0.3)), 35)
 # G3 burn-up
 shot(55.5, 60, C + V((5, -10, 1.6)), C + V((8, -9, 1.2)), fbpos(55.5), fbpos(59.6), 32)
 # H the market
 shot(60, 72, camdir_h * 98, camdir_h * 86 + V((8, 0, 0)), V((0, 0, 2)), V((0, 0, 2)), 38)
-# I1 rival
-shot(72, 76, RP + V((4.2, -3.2, 1.5)), RP + V((3.6, -2.8, 1.3)), C + V((1.5, 0, 0.6)), C + V((1.5, 0, 0.6)), 28)
-# I2 leader squint
-shot(76, 79, FC + V((5.4, -1.5, 1.2)), FC + V((4.6, -1.3, 1.0)), FC + V((0, 0, 0.1)), FC + V((0, 0, 0.1)), 42)
+# I1 the rival, swarm behind it
+shot(72, 76, RP + V((4.6, -3.6, 1.7)), RP + V((4.0, -3.1, 1.5)), C + V((1.5, 0, 0.6)), C + V((1.5, 0, 0.6)), 28)
+# I2 low angle on the mirrors
+shot(76, 79, FC + V((3.4, -3.0, -0.9)), FC + V((3.0, -2.2, -0.7)), FC + V((0, 0, 0.5)), FC + V((0, 0, 0.5)), 32)
 # I3 wide
 shot(79, 84, C + V((0.6, -12.5, 2.2)), C + V((0.6, -11.5, 2.0)), C + V((0.6, 0, 0.3)), C + V((0.2, 0, 0.5)), 30)
 # J end card
-shot(84, 90.1, FC + V((10.5, 3.6, 3.4)), FC + V((9.2, 3.1, 3.0)), FC + V((0, 0, 1.5)), FC + V((0, 0, 1.5)), 32)
+shot(84, 90.1, FC + V((13.5, 4.6, 3.6)), FC + V((12.0, 4.1, 3.2)), FC + V((0, 0, 1.5)), FC + V((0, 0, 1.5)), 32)
 
 # ---------------------------------------------------------------- render setup
 r = scene.render
@@ -849,7 +1013,7 @@ r.resolution_x, r.resolution_y = 1920, 1080
 r.resolution_percentage = 50 if "--half" in argv else 100
 r.film_transparent = False
 try:
-    scene.eevee.taa_render_samples = 20
+    scene.eevee.taa_render_samples = 32
 except Exception as ex:
     print("samples", ex)
 r.image_settings.file_format = "JPEG"
@@ -887,6 +1051,6 @@ print("saved", blend)
 
 for t in STILLS:
     scene.frame_set(F(t))
-    r.filepath = os.path.join(ROOT, "out", "stills2", "t%05.1f.jpg" % t)
+    r.filepath = os.path.join(ROOT, "out", "stills3", "t%05.1f.jpg" % t)
     bpy.ops.render.render(write_still=True)
     print("still", t)

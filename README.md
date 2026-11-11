@@ -31,8 +31,8 @@ We clean up after them.
 | **Ablation de-orbit** | The heated surface vaporizes and pushes the object like a tiny rocket. Aimed against the orbit, it lowers the perigee until drag takes over. |
 | **Subscription** | Low Earth orbit has to be cleaned on a schedule. Mega-constellation operators (Starlink-scale), insurers and space agencies pay per shell kept clean. |
 
-The film also shows the swarm almost cooking a brand-new rocket and "accidentally" removing a
-competitor's satellite. Those parts are jokes.
+The film also shows the swarm "accidentally" removing a competitor's satellite. That part is a
+joke.
 
 ## Try it
 
@@ -54,14 +54,15 @@ Everything on screen is generated: there is no stock footage and no hand-modeled
 
 - [`blender/build_scene.py`](blender/build_scene.py) builds the whole film as one Blender 5.3 scene
   in Python: the Sun, the Earth (NASA Blue Marble and night-lights textures, procedural clouds and
-  atmosphere), 19 janitor satellites with eyes, rockets, debris, beams, explosions, in-world labels,
-  18 camera shots and every keyframe.
+  atmosphere), 19 mirror satellites (gold mirror segments, truss, foil bus, solar wings), dead
+  satellites, spent stages, debris, beams, explosions, in-world labels, 16 camera shots and every
+  keyframe.
 - [`blender/render.sh`](blender/render.sh) renders the 2,160 frames (1080p, 24 fps, EEVEE) with
   parallel Blender processes.
 - [`video/captions.py`](video/captions.py) draws the captions and logo cards.
 - [`video/soundtrack.py`](video/soundtrack.py) synthesizes the music and sound effects with numpy.
 - [`video/assemble.sh`](video/assemble.sh) joins frames, captions and audio into the mp4.
-- The five seconds of simulator footage (1:03 to 1:08) are a screen recording of `app/`, kept as
+- The simulator and calculator footage (1:02 to 1:12) is a screen recording of `app/`, kept as
   frames in `assets/sim/` and swapped in for the same frame numbers before assembly.
 
 ```bash

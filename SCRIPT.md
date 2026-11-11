@@ -1,81 +1,103 @@
 # Space Janitor: 90-second pitch script
 
-You say this to camera (or over the 3D film, `video/space-janitor-90s.mp4`). The time ranges match
-the cuts in the film, and the film's captions carry the same beats, so small drift is fine.
-About 235 words, a brisk 155 words per minute. `…` is a pause for the laugh.
+For the phone take: you talk to camera, the film plays on the laptop behind you. The script is
+**152 words**, about **68 seconds** at a calm 135 words per minute, so there are twenty seconds of
+slack for pauses and laughs. It does not need to sync with the film.
 
-| Time | You say | In the 3D film |
-|---|---|---|
-| **0:00 to 0:08** | YC asked for startups in a world of abundant space access. Launch is about to get a hundred times cheaper. Great news for space. Also great news… for space trash. | The Sun, then Earth with rockets leaving in every direction. |
-| **0:08 to 0:17** | Everybody wants to launch a satellite. Nobody wants to pick one up. There are a hundred and thirty million pieces of junk up there, each one faster than a bullet. | Drifting through a field of tumbling junk. |
-| **0:17 to 0:24** | Fun fact: in 2009, two satellites crashed at forty-two thousand kilometers an hour, and made over two thousand new pieces of trash. Trash makes more trash. | Two dead objects collide and spray fragments. |
-| **0:24 to 0:30** | On Earth, nobody wants to be the janitor. In space, neither do SpaceX or NASA. So we will. We're Space Janitor. | The lead janitor satellite: hard hat, mop, big eyes. Logo. |
-| **0:30 to 0:37** | We launch a swarm of cheap little mirror satellites. Each one reflects a bit of sunlight. Together, they focus it on one spot. | The swarm flies out into a dish formation. |
-| **0:37 to 0:47** | Like a kid with a magnifying glass… no, not that one. That one's brand new. Sorry. They're still in training. | The swarm lights up a shiny new rocket ("TARGET: TRASH, 97% sure"), panics, and sheepishly turns away. |
-| **0:47 to 1:00** | That one. A hundred mirrors, a hundred suns. No fuel, no lasers, just sunlight. The junk vaporizes, slows down, and burns up in the atmosphere. Clean. | Beams converge on a dead satellite. It glows, pops, and falls as a fireball. |
-| **1:00 to 1:12** | Our customers are mega-constellations like Starlink. Low Earth orbit has to be cleaned on a schedule, so it's a subscription. And cheap launch helps us twice: more trash to clean, and cheaper to send more janitors. | Earth wrapped in satellites; red junk dots blink out one by one. |
-| **1:12 to 1:24** | And if there's a satellite up there you really don't like… well. Nice satellite. Be a shame if somebody… focused on it. Legal says we're joking. | The swarm squints at "RIVAL CORP". *Poof.* Everyone looks at the ceiling. "oops." |
-| **1:24 to 1:30** | Space Janitor. We take out the space trash. | Logo, tagline, GitHub URL. |
+`…` is a one-beat pause. **Bold** words carry the stress.
 
-## Plain text (teleprompter)
+## The script
 
-> YC asked for startups in a world of abundant space access. Launch is about to get a hundred
-> times cheaper. Great news for space. Also great news… for space trash.
+> YC wants startups for a world of abundant space access. You know what else gets abundant? …
+> **Trash.**
 >
-> Everybody wants to launch a satellite. Nobody wants to pick one up. There are a hundred and
-> thirty million pieces of junk up there, each one faster than a bullet.
+> Everybody wants to launch a satellite. Nobody wants to take one **out**.
 >
-> Fun fact: in 2009, two satellites crashed at forty-two thousand kilometers an hour, and made
-> over two thousand new pieces of trash. Trash makes more trash.
+> Fun fact: in 2009, two satellites crashed at forty-two thousand kilometers an hour and left
+> **two thousand** pieces behind. Space has no garbage day.
 >
-> On Earth, nobody wants to be the janitor. In space, neither do SpaceX or NASA. So we will.
-> We're Space Janitor.
+> So **we're** the garbage day. Space Janitor: the job SpaceX and NASA don't want.
 >
-> We launch a swarm of cheap little mirror satellites. Each one reflects a bit of sunlight.
-> Together, they focus it on one spot.
+> A swarm of tiny mirrors focuses sunlight on a piece of junk until it burns up. No fuel. No
+> lasers. Basically a kid with a magnifying glass … and a business model.
 >
-> Like a kid with a magnifying glass… no, not that one. That one's brand new. Sorry. They're
-> still in training.
+> Starlink-size fleets pay a subscription to keep their orbit clean. And cheap launch pays us
+> **twice**: more trash, cheaper janitors.
 >
-> That one. A hundred mirrors, a hundred suns. No fuel, no lasers, just sunlight. The junk
-> vaporizes, slows down, and burns up in the atmosphere. Clean.
+> Behind me: real debris, real orbits, real prices.
 >
-> Our customers are mega-constellations like Starlink. Low Earth orbit has to be cleaned on a
-> schedule, so it's a subscription. And cheap launch helps us twice: more trash to clean, and
-> cheaper to send more janitors.
+> And if there's a satellite you don't like … shame if we **focused** on it. … Legal says I'm
+> joking.
 >
-> And if there's a satellite up there you really don't like… well. Nice satellite. Be a shame if
-> somebody… focused on it. Legal says we're joking.
->
-> Space Janitor. We take out the space trash.
+> Space Janitor. We take out the trash.
+
+## Pace check
+
+| You should be finishing | By about |
+|---|---|
+| "Space has no garbage day." | 0:24 |
+| "…SpaceX and NASA don't want." | 0:30 |
+| "…and a business model." | 0:44 |
+| "…cheaper janitors." | 0:53 |
+| "Legal says I'm joking." | 1:05 |
+| "We take out the trash." | 1:08 |
+
+## Delivery notes
+
+- Open flat and serious, then pause before "Trash." That is the first laugh.
+- "Space has no garbage day." and "So we're the garbage day." are a call and response: land the
+  first, breathe, then answer it.
+- Slow down for "No fuel. No lasers." Two separate sentences. Then throw away "and a business
+  model" as an afterthought.
+- On "Behind me", glance or point back at the laptop.
+- Say the threat line quietly and deadpan, then smile on "Legal says I'm joking."
 
 ## 한국어 번역 (참고용)
 
-| 시간 | 대사 |
+> YC가 "우주 접근이 풍부해진 세상의 스타트업"을 찾는다죠. 그때 같이 풍부해지는 게 뭔지 아세요?
+> 쓰레기입니다.
+>
+> 위성을 쏘고 싶은 사람은 많은데, 치우고 싶은 사람은 없어요.
+>
+> Fun fact: 2009년에 위성 두 대가 시속 4만 2천 km로 부딪쳐서 파편 2천 개를 남겼습니다. 우주에는
+> 쓰레기 수거일이 없거든요.
+>
+> 그래서 저희가 그 수거일입니다. Space Janitor, SpaceX도 NASA도 하기 싫어하는 일이죠.
+>
+> 작은 거울 군집이 쓰레기 한 조각에 햇빛을 모아 태워 버립니다. 연료도 레이저도 없이. 돋보기 든
+> 아이랑 똑같아요… 수익 모델이 있을 뿐이죠.
+>
+> 스타링크급 위성군이 궤도를 깨끗하게 유지하려고 구독료를 냅니다. 그리고 발사가 싸지면 저희는 두 번
+> 법니다. 쓰레기는 늘고, 미화원은 싸지니까요.
+>
+> 제 뒤에 보이는 건 실제 파편, 실제 궤도, 실제 가격입니다.
+>
+> 그리고 마음에 안 드는 위성이 있다면… 저희가 초점이라도 맞추면 큰일이겠죠. 법무팀이 농담이라고
+> 하랍니다.
+>
+> Space Janitor. 쓰레기는 저희가 내다 버립니다.
+
+## What the film shows (`video/space-janitor-90s.mp4`)
+
+| Time | On screen |
 |---|---|
-| 0:00–0:08 | YC가 "우주 접근이 풍부해진 세상의 스타트업"을 찾는다고 했죠. 발사 비용이 곧 100분의 1이 됩니다. 우주에는 좋은 소식이고… 우주 쓰레기에게도 좋은 소식이죠. |
-| 0:08–0:17 | 위성을 쏘고 싶은 사람은 많은데, 주워 오고 싶은 사람은 없습니다. 저 위에는 쓰레기가 1억 3천만 조각 있고, 하나하나가 총알보다 빠릅니다. |
-| 0:17–0:24 | Fun fact: 2009년에 위성 두 대가 시속 4만 2천 km로 부딪쳐서 새 쓰레기가 2천 조각 넘게 생겼습니다. 쓰레기가 쓰레기를 낳는 거죠. |
-| 0:24–0:30 | 지구에서도 환경미화원은 아무도 안 하려고 하죠. 우주에서는 SpaceX도 NASA도 안 하려고 합니다. 그래서 저희가 합니다. Space Janitor입니다. |
-| 0:30–0:37 | 작고 값싼 거울 위성 군집을 쏩니다. 하나하나는 햇빛을 조금 반사할 뿐이지만, 다 같이 한 점에 모읍니다. |
-| 0:37–0:47 | 돋보기를 든 아이처럼요… 아니, 그거 말고. 그건 새 거야. 죄송합니다, 아직 교육 중이라서요. |
-| 0:47–1:00 | 저거요. 거울 100개면 태양 100개. 연료도 레이저도 없이 햇빛만으로. 쓰레기는 증발하고, 느려지고, 대기권에서 타 버립니다. 깨끗하죠. |
-| 1:00–1:12 | 고객은 스타링크 같은 초대형 위성군입니다. 저궤도는 주기적으로 청소해야 하니 구독 모델이고요. 발사가 싸지면 저희는 두 번 이득입니다. 치울 쓰레기는 늘고, 미화원을 더 보내는 비용은 줄어드니까요. |
-| 1:12–1:24 | 그리고 혹시 정말 마음에 안 드는 위성이 있다면… 음. 위성 참 좋네요. 누가… 초점이라도 맞추면 큰일이겠어요. 법무팀이 농담이라고 하랍니다. |
-| 1:24–1:30 | Space Janitor. 우주 쓰레기, 저희가 내다 버립니다. |
+| 0:00 to 0:08 | The Sun, then Earth with rockets leaving in every direction. |
+| 0:08 to 0:24 | A field of tumbling junk; two dead objects collide (the 2009 fun fact). |
+| 0:24 to 0:37 | One mirror satellite, then the swarm deploying into a dish formation. |
+| 0:37 to 0:47 | Close-up of the gold mirror segments; the swarm turns to a dead satellite. |
+| 0:47 to 1:00 | Beams converge, the satellite glows, vaporizes, and falls as a fireball. |
+| 1:00 to 1:12 | The simulator and pricing calculator from `app/`, running on real debris orbits. |
+| 1:12 to 1:24 | "RIVAL CORP" gets the same treatment. "oops." |
+| 1:24 to 1:30 | Logo and tagline. |
 
 ## Numbers behind the lines
 
-- **130 million pieces**: ESA's estimate of debris objects larger than 1 mm in orbit.
-- **Faster than a bullet**: low-orbit debris moves at about 7.8 km/s (28,000 km/h), roughly ten
-  times a rifle bullet.
+- **A hundred times cheaper**: the premise of YC's request, based on reusable Starship.
 - **Fun fact (2009)**: Iridium 33 and the dead Kosmos 2251 collided at about 11.7 km/s
-  (42,000 km/h) and left more than 2,000 catalogued fragments. That is why the dead satellite in
-  the film is tagged "DEAD SINCE 2009".
-- **A hundred mirrors, a hundred suns**: 100 mirrors of 1 m² collect 136 kW of sunlight, a hundred
-  suns' worth, and deliver about 122 kW. The Sun is 0.53° wide, so from 100 m away each mirror's
-  spot is about 1.9 m across: roughly 42 kW/m² on the target, which settles near 930 K, right at
-  aluminum's melting point (933 K). About 400 mirrors reach 1,300 K. The calculator in `app/`
-  shows the numbers for any object.
-- **Slows down**: vaporizing material pushes back like a tiny rocket. Aim it against the orbit and
-  the perigee drops until drag finishes the job. Same idea as laser ablation, with no laser.
+  (42,000 km/h) and left more than 2,000 catalogued fragments. The simulator loads those fragments.
+- **Burns up**: 100 mirrors of 1 m² collect 136 kW of sunlight and deliver about 122 kW. The Sun
+  is 0.53° wide, so from 100 m away the spot is about 1.9 m across: roughly 42 kW/m², which settles
+  near 930 K, right at aluminum's melting point (933 K). About 400 mirrors reach 1,300 K. The
+  calculator in `app/` shows the numbers for any object.
+- **Slows down**: vaporizing material pushes back like a tiny rocket. Aimed against the orbit, it
+  lowers the perigee until drag finishes the job. Same idea as laser ablation, with no laser.

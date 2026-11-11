@@ -171,15 +171,6 @@ def sparkle(dur=1.4, count=14):
     return out
 
 
-def scratch():
-    t = tt(0.42)
-    x = t / 0.42
-    ph = TAU * np.cumsum(420 * (50 / 420) ** x) / SR
-    tone = sum(np.sin(n * ph) / n for n in range(1, 7))
-    grit = bandnoise(0.42, 900, 5000) * (0.5 + 0.5 * np.sign(np.sin(TAU * 34 * t * (1 - 0.5 * x))))
-    return (tone + 0.8 * grit) * (1 - 0.6 * x)
-
-
 def whistle(f, dur, vib=0.012, glide_from=None):
     t = tt(dur)
     fr = np.full_like(t, f)
@@ -282,13 +273,31 @@ for m in (60, 64, 67, 72, 76):   # theme hit at 24.0
 groove(12, 'Am', 0.75, t_from=30.0)
 groove(13, 'G', 0.75)
 groove(14, 'C', 0.75)
-# 37-42.7 wrong target: suspense on the dominant, cut dead at 42.7
-groove(15, 'F', 0.7, t_to=38.4)
-groove(16, 'G', 0.65, kick_on=True, bass_on=True)
-groove(17, 'G', 0.65, t_to=42.7)
-# 45-48 tiptoe back in (staccato plucks only)
-for i, m in enumerate((60, 64, 67, 64, 60, 64, 67, 72, 67, 72)):
-    place(arp, 45.0 + i * 0.3, pluck(m, 0.2, decay=14), 0.40 + 0.03 * i, pan=0.3 * (-1) ** i)
+# 36-48 one continuous, calm stretch of the groove that gently builds anticipation.
+# 37-41.2 beauty close-up of a mirror satellite (airy: no kick, high shimmer),
+# 41.2-47 the whole swarm slowly turns toward the dead satellite (kick returns, level creeps up).
+# This section draws its noise from its own generator and then advances the main one by the
+# amount the earlier cut used, so every random detail elsewhere in the track stays identical.
+_main_rng = rng
+rng = np.random.default_rng(41)
+groove(15, 'F', 0.7)
+groove(16, 'Am', 0.60, kick_on=False)
+groove(17, 'Dm', 0.62)
+groove(18, 'G', 0.66)
+groove(19, 'G', 0.70)
+# shimmer: soft high pad + offbeat glassy arpeggio, 37.0-41.4
+t = tt(4.4)
+shim_env = (np.sin(np.pi * t / 4.4) ** 0.8 * (0.8 + 0.2 * np.sin(TAU * 3.1 * t)))[:, None]
+for m, g_ in ((84, 0.050), (88, 0.040), (91, 0.035), (96, 0.022)):
+    place(bed, 37.0, pad(m, 4.4) * shim_env, g_)
+for k in range(14):
+    tk = 37.05 + 0.3 * k
+    tri = CH['F'][1] if tk < 38.4 else CH['Am'][1]
+    m = (tri[0] + 24, tri[2] + 24, tri[1] + 36, tri[2] + 24, tri[0] + 36, tri[1] + 24)[k % 6]
+    place(arp, tk, pluck(m, 0.7, bright=0.35, decay=5), 0.085 * np.sin(np.pi * (k + 1) / 15) ** 0.6 + 0.03,
+          pan=0.6 * (-1) ** k)
+rng = _main_rng
+rng.standard_normal(11 * int(SR * 0.06))
 # 48-54.5 building on the right target
 groove(20, 'C', 0.55, kick_on=False, claps=False)
 groove(21, 'F', 0.72)
@@ -326,12 +335,12 @@ echo[d:] += 0.30 * arp[:-d, ::-1]
 echo[2 * d:] += 0.12 * arp[:-2 * d]
 bed += arp + echo
 
-# bed automation: hard drop at 42.7, duck around the vaporize pop, clear for the whistle
+# bed automation: dip after the collision, duck around the vaporize pop, clear for the whistle
 tl = np.arange(N) / SR
 auto = np.interp(tl,
-                 [0, 19.55, 19.62, 21.6, 42.70, 42.71, 44.98, 45.0, 54.49, 54.51, 55.2, 56.5,
+                 [0, 19.55, 19.62, 21.6, 54.49, 54.51, 55.2, 56.5,
                   79.2, 79.5, 83.95, 84.0, 90],
-                 [1, 1.00, 0.45, 1.0, 1.00, 0.00, 0.00, 1.0, 1.00, 0.25, 0.25, 1.0,
+                 [1, 1.00, 0.45, 1.0, 1.00, 0.25, 0.25, 1.0,
                   1.0, 0.0, 0.0, 1.0, 1.0])
 bed *= auto[:, None]
 
@@ -356,12 +365,19 @@ for k in range(18):
     f = mtof(m)
     b = (np.sin(TAU * f * t) + 0.3 * np.sin(TAU * 2 * f * t)) * np.exp(-t * 18)
     place_sfx(30.3 + 0.11 * k, b, -11, pan=0.6 * (-1) ** k)
-# 38.4 charge on the wrong target -> 42.7 fail
-place_sfx(38.4, hum(4.3, 55, 233), -8)
-place_sfx(42.7, scratch(), -5)
-# 43.2 sheepish two-note blip
-place_sfx(43.2, np.sin(TAU * 659.3 * tt(0.14)) * np.exp(-tt(0.14) * 8), -11, pan=0.15)
-place_sfx(43.38, np.sin(TAU * 523.3 * tt(0.22)) * np.exp(-tt(0.22) * 7), -12, pan=0.15)
+# 41.5-44 the swarm turns: subtle low servo swell
+t = tt(2.5)
+x = t / 2.5
+ph = TAU * np.cumsum(62 + 48 * np.sin(np.pi * x / 2) ** 2) / SR
+servo = sum(np.sin(n * ph) / n ** 1.2 for n in range(1, 7)) * (1 + 0.12 * np.sin(TAU * 23 * t))
+place_sfx(41.5, servo * np.sin(np.pi * x) ** 1.5, -19)
+# 44.5 soft "target lock" double-beep
+for t0 in (44.5, 44.66):
+    t = tt(0.09)
+    beep = (np.sin(TAU * 1568 * t) + 0.2 * np.sin(TAU * 3136 * t)) \
+        * np.minimum(t / 0.006, 1) * np.minimum((0.09 - t) / 0.03, 1)
+    place_sfx(t0, beep, -12, pan=0.1)
+rng.standard_normal(int(SR * 0.42))   # keeps later random details where they were
 # 47 charge on the right target -> 54.5 vaporize
 place_sfx(47.0, hum(7.5, 55, 262), -8)
 place_sfx(54.5, pop(), -4)
@@ -424,8 +440,8 @@ for s in range(0, 90, 5):
     print(f'  {s:2d}-{s + 5:2d}s  {dbfs(np.sqrt(np.mean(seg ** 2))):6.1f}')
 print('event energy (RMS dBFS over 0.25 s from the cue; peak):')
 EV = [(1.5, 'sun drone'), (3.6, 'beat in'), (9.3, 'tink'), (19.6, 'collision'), (24.0, 'theme hit'),
-      (30.3, 'first blip'), (32.17, 'last blip'), (40.0, 'charge hum'), (42.7, 'fail cue'),
-      (43.2, 'sheepish blip'), (44.2, '(silence)'), (45.0, 'tiptoe'), (50.0, 'charge+build'),
+      (30.3, 'first blip'), (32.17, 'last blip'), (38.0, 'shimmer'), (42.7, 'servo swell'),
+      (44.5, 'target lock'), (46.0, 'groove'), (50.0, 'charge+build'),
       (54.5, 'vaporize'), (57.0, 'falling whistle'), (59.0, 'ding'), (60.0, 'groove'),
       (72.0, 'villain bass'), (80.5, 'charge'), (81.4, 'pop'), (82.1, 'whistle 1'), (82.7, 'whistle 2'),
       (83.25, 'whistle 3'), (84.0, 'final theme'), (88.8, 'tonic'), (89.9, '(end of fade)')]
