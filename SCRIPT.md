@@ -77,6 +77,13 @@ slack for pauses and laughs. It does not need to sync with the film.
 >
 > Space Janitor. 쓰레기는 저희가 내다 버립니다.
 
+## If a judge asks "does it really burn?"
+
+> A hundred one-meter mirrors from a hundred meters put about 42 kilowatts per square meter on the
+> target. That is around 930 kelvin, right at aluminum's melting point, and well past where
+> insulation foil and paint break down. Four hundred mirrors reach 1,300 kelvin. More mirrors is
+> exactly what cheap launch buys us, and you can try any object in our calculator.
+
 ## What the film shows (`video/space-janitor-90s.mp4`)
 
 | Time | On screen |
