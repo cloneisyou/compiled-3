@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space Janitor</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script src="vendor/satellite.min.js"></script>
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="dot"></span>Space Janitor</div>
+  <nav>
+    <a href="#sim">Simulator</a>
+    <a href="#calc">Pricing</a>
+  </nav>
+  <div class="counters">
+    <div><b id="c-count">0</b><span>objects removed</span></div>
+    <div><b id="c-kg">0 kg</b><span>mass removed</span></div>
+    <div><b id="c-rev">$0</b><span>revenue</span></div>
+  </div>
+  <button id="btn-assume" class="ghost">Assumptions</button>
+</header>
+
+<section id="sim">
+  <canvas id="scene"></canvas>
+
+  <aside id="list-panel" class="panel">
+    <div class="panel-head">
+      <h2>Tracked debris</h2>
+      <span id="obj-count" class="muted"></span>
+    </div>
+    <input id="search" type="search" placeholder="Search name or NORAD ID" autocomplete="off">
+    <div class="legend">
+      <span><i style="background:#ff9d4d"></i>Cosmos 2251</span>
+      <span><i style="background:#4dd8ff"></i>Iridium 33</span>
+      <span><i style="background:#b9a6ff"></i>Fengyun-1C</span>
+    </div>
+    <ul id="list"></ul>
+  </aside>
+
+  <aside id="target-panel" class="panel">
+    <div id="target-empty" class="muted">Click an object or pick one from the list.</div>
+    <div id="target-body" hidden>
+      <div class="panel-head">
+        <h2 id="t-name"></h2>
+        <span id="t-id" class="muted"></span>
+      </div>
+      <dl class="kv">
+        <div><dt>Apogee</dt><dd id="t-apo"></dd></div>
+        <div><dt>Perigee</dt><dd id="t-peri"></dd></div>
+        <div><dt>Period</dt><dd id="t-period"></dd></div>
+        <div><dt>Inclination</dt><dd id="t-inc"></dd></div>
+        <div><dt>Mass <em>est.</em></dt><dd id="t-mass"></dd></div>
+        <div><dt>Size <em>est.</em></dt><dd id="t-size"></dd></div>
+      </dl>
+      <dl class="kv plan">
+        <div><dt>Thrust</dt><dd id="t-thrust"></dd></div>
+        <div><dt>Δv needed</dt><dd id="t-dv"></dd></div>
+        <div><dt>Time to de-orbit</dt><dd id="t-time"></dd></div>
+        <div><dt>Price</dt><dd id="t-price"></dd></div>
+      </dl>
+      <button id="btn-clean" class="primary">Clean it</button>
+      <div id="mission" hidden>
+        <div class="mission-top">
+          <span id="m-status">Engaging</span>
+          <span id="m-day" class="muted"></span>
+        </div>
+        <div class="big"><span id="m-peri">—</span><small>km perigee</small></div>
+        <div class="bar"><i id="m-bar"></i></div>
+        <div class="mission-foot muted">
+          <span id="m-dv"></span>
+          <span id="m-rate"></span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="timebar" class="panel">
+    <span id="clock"></span>
+    <div class="warp">
+      <button data-warp="1">1×</button>
+      <button data-warp="60" class="on">60×</button>
+      <button data-warp="600">600×</button>
+      <button data-warp="3600">3600×</button>
+    </div>
+    <span class="muted" id="snapshot"></span>
+  </div>
+</section>
+
+<section id="calc">
+  <div class="calc-wrap">
+    <div class="calc-head">
+      <h1>Price per removal</h1>
+      <div class="presets">
+        <button data-preset="1,0.15,800">1 kg fragment</button>
+        <button data-preset="100,1,780">100 kg</button>
+        <button data-preset="1400,3,800">1.4 t satellite</button>
+      </div>
+    </div>
+    <div class="calc-grid">
+      <form id="inputs" class="card" onsubmit="return false">
+        <label>Object mass <span class="unit">kg</span><input id="i-mass" type="number" min="0.001" step="any" value="100"></label>
+        <label>Object size <span class="unit">m</span><input id="i-size" type="number" min="0.01" step="any" value="1"></label>
+        <label>Orbit altitude <span class="unit">km</span><input id="i-alt" type="number" min="150" max="36000" step="10" value="780"></label>
+        <label class="slider">Mirrors <output id="o-n">100</output><input id="i-n" type="range" min="1" max="2000" step="1" value="100"></label>
+        <label>Mirror area <span class="unit">m²</span><input id="i-area" type="number" min="0.1" step="any" value="1"></label>
+        <label>Deadline <span class="unit">days</span><input id="i-deadline" type="number" min="0.1" step="any" value="30"></label>
+      </form>
+      <div class="outs">
+        <div class="card price">
+          <span class="lbl">Price per removal</span>
+          <b id="r-price"></b>
+          <span class="sub" id="r-price-sub"></span>
+          <div class="cmp">
+            <div><span>Launch at <span id="r-l1"></span>/kg</span><b id="r-price1"></b><i id="r-bar1"></i></div>
+            <div><span>Launch at <span id="r-l2"></span>/kg (today)</span><b id="r-price2"></b><i id="r-bar2"></i></div>
+          </div>
+        </div>
+        <div class="card"><span class="lbl">Optical power on target</span><b id="r-power"></b><span class="sub" id="r-power-sub"></span></div>
+        <div class="card"><span class="lbl">Spot size</span><b id="r-spot"></b><span class="sub" id="r-spot-sub"></span></div>
+        <div class="card"><span class="lbl">Equilibrium temperature</span><b id="r-temp"></b><span class="sub" id="r-temp-sub"></span></div>
+        <div class="card"><span class="lbl">Thrust</span><b id="r-thrust"></b><span class="sub" id="r-thrust-sub"></span></div>
+        <div class="card"><span class="lbl">Δv needed</span><b id="r-dv"></b><span class="sub" id="r-dv-sub"></span></div>
+        <div class="card"><span class="lbl">Time to de-orbit</span><b id="r-time"></b><span class="sub" id="r-time-sub"></span></div>
+        <div class="card"><span class="lbl">Mirrors for deadline</span><b id="r-need"></b><span class="sub" id="r-need-sub"></span></div>
+        <div class="card"><span class="lbl">Swarm cost</span><b id="r-capex"></b><span class="sub" id="r-capex-sub"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="drawer" aria-hidden="true">
+  <div class="panel-head">
+    <h2>Assumptions</h2>
+    <div>
+      <button id="btn-reset" class="ghost small">Reset</button>
+      <button id="btn-close" class="ghost small">Close</button>
+    </div>
+  </div>
+  <div id="assume-list"></div>
+  <p class="muted note">Cm is the key uncertain assumption: thrust, time and price all scale with it.</p>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
